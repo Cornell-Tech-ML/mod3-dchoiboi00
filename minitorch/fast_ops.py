@@ -168,8 +168,26 @@ def tensor_map(
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
-        # TODO: Implement for Task 3.1.
-        raise NotImplementedError("Need to implement for Task 3.1")
+        
+        # fn is already 'njit'ed
+
+        # Check if shapes + strides are aligned. If so, run function on storage directly.
+        if np.array_equal(in_strides, out_strides) and np.array_equal(in_shape, out_shape):
+            for i in prange(len(out)):
+                out[i] = fn(in_storage[i])
+
+        # Otherwise, calculate indices and run parallel loop.
+        else:
+            for i in prange(len(out)):
+                print("out_shape", out_shape)
+                out_index = np.empty(MAX_DIMS, dtype=np.int32)
+                in_index = np.empty(MAX_DIMS, dtype=np.int32)
+                to_index(i, out_shape, out_index)
+                broadcast_index(out_index, out_shape, in_shape, in_index)
+                o = index_to_position(out_index, out_strides)
+                j = index_to_position(in_index, in_strides)
+                out[o] = fn(in_storage[j])
+
 
     return njit(_map, parallel=True)  # type: ignore
 
@@ -208,8 +226,29 @@ def tensor_zip(
         b_shape: Shape,
         b_strides: Strides,
     ) -> None:
-        # TODO: Implement for Task 3.1.
-        raise NotImplementedError("Need to implement for Task 3.1")
+        
+        # Check if shapes + strides are aligned. If so, run function on storage directly.
+        if np.array_equal(a_strides, b_strides) and np.array_equal(a_shape, b_shape) \
+        and np.array_equal(a_strides, out_strides) and np.array_equal(a_shape, out_shape):
+            for i in prange(len(out)):
+                out[i] = fn(a_storage[i], b_storage[i])
+        
+        # Otherwise, calculate indices and run parallel loop.
+        else:
+            for i in prange(len(out)):
+                out_index = np.empty(MAX_DIMS, dtype=np.int32)
+                a_index = np.empty(MAX_DIMS, dtype=np.int32)
+                b_index = np.empty(MAX_DIMS, dtype=np.int32)
+
+                to_index(i, out_shape, out_index)
+                broadcast_index(out_index, out_shape, a_shape, a_index)
+                broadcast_index(out_index, out_shape, b_shape, b_index)
+
+                o = index_to_position(out_index, out_strides)
+                a_pos = index_to_position(a_index, a_strides)
+                b_pos = index_to_position(b_index, b_strides)
+
+                out[o] = fn(a_storage[a_pos], b_storage[b_pos])
 
     return njit(_zip, parallel=True)  # type: ignore
 
