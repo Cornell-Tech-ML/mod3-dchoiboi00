@@ -168,9 +168,6 @@ def tensor_map(
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
-        
-        # fn is already 'njit'ed
-
         # Check if shapes + strides are aligned. If so, run function on storage directly.
         if np.array_equal(in_strides, out_strides) and np.array_equal(in_shape, out_shape):
             for i in prange(len(out)):
@@ -283,8 +280,21 @@ def tensor_reduce(
         a_strides: Strides,
         reduce_dim: int,
     ) -> None:
-        # TODO: Implement for Task 3.1.
-        raise NotImplementedError("Need to implement for Task 3.1")
+        
+        for i in prange(len(out)):
+            out_index = np.empty(MAX_DIMS, dtype=np.int32)
+            reduce_size = a_shape[reduce_dim]
+            to_index(i, out_shape, out_index)
+            o = index_to_position(out_index, out_strides)
+
+            # reduce across the reduce_dim
+            j = index_to_position(out_index, a_strides)
+            acc = out[o]
+            step = a_strides[reduce_dim]
+            for _ in range(reduce_size):
+                acc = fn(acc, a_storage[j])
+                j += step
+            out[o] = acc
 
     return njit(_reduce, parallel=True)  # type: ignore
 
@@ -332,11 +342,27 @@ def _tensor_matrix_multiply(
         None : Fills in `out`
 
     """
+    # A[batch, row, k] @ B[batch, k, col] = C[batch, row, col]
+
+    assert a_shape[-1] == b_shape[-2], "Shapes do not match for matrix mult." # Matrix multiply condition
     a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
     b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
 
-    # TODO: Implement for Task 3.2.
-    raise NotImplementedError("Need to implement for Task 3.2")
+    # Parallel outer loop
+    for batch in prange(out_shape[0]):
+        for row in prange(out_shape[-2]):
+            for col in prange(out_shape[-1]):
+                a_pos = batch * a_batch_stride + row * a_strides[-2]  # starting a-pos, local var
+                b_pos = batch * b_batch_stride + col * b_strides[-1]  # starting b-pos, local var
+
+                acc = 0.0
+                for _ in range(a_shape[-1]):
+                    acc += a_storage[a_pos] * b_storage[b_pos]  # accumulate, one multiply
+                    a_pos += a_strides[-1]  # Move along row in A
+                    b_pos += b_strides[-2]  # Move along col in B
+                
+                out_pos = batch * out_strides[0] + row * out_strides[-2] + col * out_strides[-1]
+                out[out_pos] = acc
 
 
 tensor_matrix_multiply = njit(_tensor_matrix_multiply, parallel=True)

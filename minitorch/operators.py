@@ -85,7 +85,7 @@ def sigmoid(x: float) -> float:
 
 def relu(x: float) -> float:
     """Applies the ReLU activation function."""
-    return max(0.0, x)
+    return x if x > 0 else 0.0
 
 
 EPS = 1e-6
