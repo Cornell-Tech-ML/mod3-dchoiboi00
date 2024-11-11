@@ -169,16 +169,17 @@ def tensor_map(
         in_strides: Strides,
     ) -> None:
         # Check if shapes + strides are aligned. If so, run function on storage directly.
-        if np.array_equal(in_strides, out_strides) and np.array_equal(in_shape, out_shape):
+        same_strides = len(in_strides) == len(out_strides) and (in_strides == out_strides).all()
+        same_shape = len(in_shape) == len(out_shape) and (in_shape == out_shape).all()
+        if same_strides and same_shape:
             for i in prange(len(out)):
                 out[i] = fn(in_storage[i])
 
         # Otherwise, calculate indices and run parallel loop.
         else:
             for i in prange(len(out)):
-                print("out_shape", out_shape)
-                out_index = np.empty(MAX_DIMS, dtype=np.int32)
-                in_index = np.empty(MAX_DIMS, dtype=np.int32)
+                out_index: Index = np.zeros(MAX_DIMS, dtype=np.int32)
+                in_index: Index = np.zeros(MAX_DIMS, dtype=np.int32)
                 to_index(i, out_shape, out_index)
                 broadcast_index(out_index, out_shape, in_shape, in_index)
                 o = index_to_position(out_index, out_strides)
@@ -225,17 +226,20 @@ def tensor_zip(
     ) -> None:
         
         # Check if shapes + strides are aligned. If so, run function on storage directly.
-        if np.array_equal(a_strides, b_strides) and np.array_equal(a_shape, b_shape) \
-        and np.array_equal(a_strides, out_strides) and np.array_equal(a_shape, out_shape):
+        same_strides = len(a_strides) == len(b_strides) and len(a_strides) == len(out_strides) \
+            and (a_strides == b_strides).all() and (a_strides == out_strides).all()
+        same_shape = len(a_shape) == len(b_shape) and len(a_shape) == len(out_shape) \
+            and (a_shape == b_shape).all() and (a_shape == out_shape).all()
+        if same_strides and same_shape:
             for i in prange(len(out)):
                 out[i] = fn(a_storage[i], b_storage[i])
         
         # Otherwise, calculate indices and run parallel loop.
         else:
             for i in prange(len(out)):
-                out_index = np.empty(MAX_DIMS, dtype=np.int32)
-                a_index = np.empty(MAX_DIMS, dtype=np.int32)
-                b_index = np.empty(MAX_DIMS, dtype=np.int32)
+                out_index: Index = np.zeros(MAX_DIMS, dtype=np.int32)
+                a_index: Index = np.zeros(MAX_DIMS, dtype=np.int32)
+                b_index: Index = np.zeros(MAX_DIMS, dtype=np.int32)
 
                 to_index(i, out_shape, out_index)
                 broadcast_index(out_index, out_shape, a_shape, a_index)
@@ -282,7 +286,7 @@ def tensor_reduce(
     ) -> None:
         
         for i in prange(len(out)):
-            out_index = np.empty(MAX_DIMS, dtype=np.int32)
+            out_index: Index = np.zeros(MAX_DIMS, dtype=np.int32)
             reduce_size = a_shape[reduce_dim]
             to_index(i, out_shape, out_index)
             o = index_to_position(out_index, out_strides)
