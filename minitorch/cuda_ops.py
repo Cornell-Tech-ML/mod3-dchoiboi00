@@ -378,7 +378,7 @@ def tensor_reduce(
 
 
 def _mm_practice(out: Storage, a: Storage, b: Storage, size: int) -> None:
-    """This is a practice square MM kernel to prepare for matmul.
+    """A practice square MM kernel to prepare for matmul.
 
     Given a storage `out` and two storage `a` and `b`. Where we know
     both are shape [size, size] with strides [size, 1].
@@ -409,8 +409,28 @@ def _mm_practice(out: Storage, a: Storage, b: Storage, size: int) -> None:
 
     """
     BLOCK_DIM = 32
-    # TODO: Implement for Task 3.3.
-    raise NotImplementedError("Need to implement for Task 3.3")
+
+    i = cuda.threadIdx.x
+    j = cuda.threadIdx.y
+
+    # Shared memory for a and b matrices, [size, size]
+    shared_a = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
+    shared_b = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
+
+    # If within bounds, copy data to shared memory
+    if i < size and j < size:
+        shared_a[j, i] = a[j * size + i]
+        shared_b[j, i] = b[j * size + i]
+    
+    cuda.syncthreads()
+
+    # Compute the dot product for position out[i, j], and write to global at the end
+    if i < size and j < size:
+        result = 0.0
+        for k in range(size):
+            result += shared_a[j, k] * shared_b[k, i]
+    
+        out[j * size + i] = result
 
 
 jit_mm_practice = jit(_mm_practice)
