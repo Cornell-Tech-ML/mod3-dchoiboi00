@@ -224,7 +224,6 @@ def tensor_zip(
         b_shape: Shape,
         b_strides: Strides,
     ) -> None:
-        
         # Check if shapes + strides are aligned. If so, run function on storage directly.
         same_strides = len(a_strides) == len(b_strides) and len(a_strides) == len(out_strides) \
             and (a_strides == b_strides).all() and (a_strides == out_strides).all()
