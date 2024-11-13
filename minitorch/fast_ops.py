@@ -178,8 +178,8 @@ def tensor_map(
         # Otherwise, calculate indices and run parallel loop.
         else:
             for i in prange(len(out)):
-                out_index: Index = np.zeros(MAX_DIMS, dtype=np.int32)
-                in_index: Index = np.zeros(MAX_DIMS, dtype=np.int32)
+                out_index: Index = np.empty(MAX_DIMS, dtype=np.int32)
+                in_index: Index = np.empty(MAX_DIMS, dtype=np.int32)
                 to_index(i, out_shape, out_index)
                 broadcast_index(out_index, out_shape, in_shape, in_index)
                 o = index_to_position(out_index, out_strides)
@@ -236,9 +236,9 @@ def tensor_zip(
         # Otherwise, calculate indices and run parallel loop.
         else:
             for i in prange(len(out)):
-                out_index: Index = np.zeros(MAX_DIMS, dtype=np.int32)
-                a_index: Index = np.zeros(MAX_DIMS, dtype=np.int32)
-                b_index: Index = np.zeros(MAX_DIMS, dtype=np.int32)
+                out_index: Index = np.empty(MAX_DIMS, dtype=np.int32)
+                a_index: Index = np.empty(MAX_DIMS, dtype=np.int32)
+                b_index: Index = np.empty(MAX_DIMS, dtype=np.int32)
 
                 to_index(i, out_shape, out_index)
                 broadcast_index(out_index, out_shape, a_shape, a_index)
@@ -285,7 +285,7 @@ def tensor_reduce(
     ) -> None:
         
         for i in prange(len(out)):
-            out_index: Index = np.zeros(MAX_DIMS, dtype=np.int32)
+            out_index: Index = np.empty(MAX_DIMS, dtype=np.int32)
             reduce_size = a_shape[reduce_dim]
             to_index(i, out_shape, out_index)
             o = index_to_position(out_index, out_strides)
@@ -346,7 +346,7 @@ def _tensor_matrix_multiply(
 
     """
     # A[batch, row, k] @ B[batch, k, col] = C[batch, row, col]
-
+    print("Running fast ops matrix multiply")
     assert a_shape[-1] == b_shape[-2], "Shapes do not match for matrix mult." # Matrix multiply condition
     a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
     b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
@@ -354,7 +354,7 @@ def _tensor_matrix_multiply(
     # Parallel outer loop
     for batch in prange(out_shape[0]):
         for row in prange(out_shape[-2]):
-            for col in prange(out_shape[-1]):
+            for col in range(out_shape[-1]):
                 a_pos = batch * a_batch_stride + row * a_strides[-2]  # starting a-pos, local var
                 b_pos = batch * b_batch_stride + col * b_strides[-1]  # starting b-pos, local var
 
