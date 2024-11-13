@@ -346,7 +346,7 @@ def _tensor_matrix_multiply(
 
     """
     # A[batch, row, k] @ B[batch, k, col] = C[batch, row, col]
-    print("Running fast ops matrix multiply")
+    #print("Running fast ops matrix multiply")
     assert a_shape[-1] == b_shape[-2], "Shapes do not match for matrix mult." # Matrix multiply condition
     a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
     b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
