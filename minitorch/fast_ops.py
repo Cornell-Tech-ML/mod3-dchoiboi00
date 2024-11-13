@@ -30,6 +30,7 @@ Fn = TypeVar("Fn")
 
 
 def njit(fn: Fn, **kwargs: Any) -> Fn:
+    """Decorator to JIT compile functions with NUMBA."""
     return _njit(inline="always", **kwargs)(fn)  # type: ignore
 
 
@@ -169,7 +170,9 @@ def tensor_map(
         in_strides: Strides,
     ) -> None:
         # Check if shapes + strides are aligned. If so, run function on storage directly.
-        same_strides = len(in_strides) == len(out_strides) and (in_strides == out_strides).all()
+        same_strides = (
+            len(in_strides) == len(out_strides) and (in_strides == out_strides).all()
+        )
         same_shape = len(in_shape) == len(out_shape) and (in_shape == out_shape).all()
         if same_strides and same_shape:
             for i in prange(len(out)):
@@ -185,7 +188,6 @@ def tensor_map(
                 o = index_to_position(out_index, out_strides)
                 j = index_to_position(in_index, in_strides)
                 out[o] = fn(in_storage[j])
-
 
     return njit(_map, parallel=True)  # type: ignore
 
@@ -225,14 +227,22 @@ def tensor_zip(
         b_strides: Strides,
     ) -> None:
         # Check if shapes + strides are aligned. If so, run function on storage directly.
-        same_strides = len(a_strides) == len(b_strides) and len(a_strides) == len(out_strides) \
-            and (a_strides == b_strides).all() and (a_strides == out_strides).all()
-        same_shape = len(a_shape) == len(b_shape) and len(a_shape) == len(out_shape) \
-            and (a_shape == b_shape).all() and (a_shape == out_shape).all()
+        same_strides = (
+            len(a_strides) == len(b_strides)
+            and len(a_strides) == len(out_strides)
+            and (a_strides == b_strides).all()
+            and (a_strides == out_strides).all()
+        )
+        same_shape = (
+            len(a_shape) == len(b_shape)
+            and len(a_shape) == len(out_shape)
+            and (a_shape == b_shape).all()
+            and (a_shape == out_shape).all()
+        )
         if same_strides and same_shape:
             for i in prange(len(out)):
                 out[i] = fn(a_storage[i], b_storage[i])
-        
+
         # Otherwise, calculate indices and run parallel loop.
         else:
             for i in prange(len(out)):
@@ -283,7 +293,6 @@ def tensor_reduce(
         a_strides: Strides,
         reduce_dim: int,
     ) -> None:
-        
         for i in prange(len(out)):
             out_index: Index = np.empty(MAX_DIMS, dtype=np.int32)
             reduce_size = a_shape[reduce_dim]
@@ -346,8 +355,10 @@ def _tensor_matrix_multiply(
 
     """
     # A[batch, row, k] @ B[batch, k, col] = C[batch, row, col]
-    #print("Running fast ops matrix multiply")
-    assert a_shape[-1] == b_shape[-2], "Shapes do not match for matrix mult." # Matrix multiply condition
+    # print("Running fast ops matrix multiply")
+    assert (
+        a_shape[-1] == b_shape[-2]
+    ), "Shapes do not match for matrix mult."  # Matrix multiply condition
     a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
     b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
 
@@ -355,16 +366,26 @@ def _tensor_matrix_multiply(
     for batch in prange(out_shape[0]):
         for row in prange(out_shape[-2]):
             for col in range(out_shape[-1]):
-                a_pos = batch * a_batch_stride + row * a_strides[-2]  # starting a-pos, local var
-                b_pos = batch * b_batch_stride + col * b_strides[-1]  # starting b-pos, local var
+                a_pos = (
+                    batch * a_batch_stride + row * a_strides[-2]
+                )  # starting a-pos, local var
+                b_pos = (
+                    batch * b_batch_stride + col * b_strides[-1]
+                )  # starting b-pos, local var
 
                 acc = 0.0
                 for _ in range(a_shape[-1]):
-                    acc += a_storage[a_pos] * b_storage[b_pos]  # accumulate, one multiply
+                    acc += (
+                        a_storage[a_pos] * b_storage[b_pos]
+                    )  # accumulate, one multiply
                     a_pos += a_strides[-1]  # Move along row in A
                     b_pos += b_strides[-2]  # Move along col in B
-                
-                out_pos = batch * out_strides[0] + row * out_strides[-2] + col * out_strides[-1]
+
+                out_pos = (
+                    batch * out_strides[0]
+                    + row * out_strides[-2]
+                    + col * out_strides[-1]
+                )
                 out[out_pos] = acc
 
 
