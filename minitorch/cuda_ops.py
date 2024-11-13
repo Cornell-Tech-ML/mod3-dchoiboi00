@@ -183,9 +183,9 @@ def tensor_map(
         if i < out_size:
             to_index(i, out_shape, out_index)
             broadcast_index(out_index, out_shape, in_shape, in_index)
-            o = index_to_position(out_index, out_strides)
+            # o = index_to_position(out_index, out_strides)
             j = index_to_position(in_index, in_strides)
-            out[o] = fn(in_storage[j])
+            out[i] = fn(in_storage[j])
 
     return cuda.jit()(_map)  # type: ignore
 
@@ -234,11 +234,11 @@ def tensor_zip(
             broadcast_index(out_index, out_shape, a_shape, a_index)
             broadcast_index(out_index, out_shape, b_shape, b_index)
 
-            o = index_to_position(out_index, out_strides)
+            # o = index_to_position(out_index, out_strides)
             a_pos = index_to_position(a_index, a_strides)
             b_pos = index_to_position(b_index, b_strides)
 
-            out[o] = fn(a_storage[a_pos], b_storage[b_pos])
+            out[i] = fn(a_storage[a_pos], b_storage[b_pos])
 
     return cuda.jit()(_zip)  # type: ignore
 
@@ -357,9 +357,10 @@ def tensor_reduce(
         # Calculate starting position in a_storage
         a_pos = index_to_position(a_index, a_strides)
         cache[pos] = reduce_value
+        reduce_size = a_shape[reduce_dim]
 
         # Move in steps of BLOCK_DIM along reduce_dim
-        while a_index[reduce_dim] < a_shape[reduce_dim]:
+        while a_index[reduce_dim] < reduce_size:
             cache[pos] = fn(cache[pos], a_storage[a_pos])
             a_index[reduce_dim] += BLOCK_DIM
             a_pos = index_to_position(a_index, a_strides)
