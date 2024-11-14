@@ -341,7 +341,7 @@ def tensor_reduce(
         pos = cuda.threadIdx.x
 
         if out_pos < out_size:
-            # cache[pos] = reduce_value  # start out
+            cache[pos] = reduce_value  # start out
             to_index(
                 out_pos, out_shape, out_index
             )  # get out_index of out_pos (current block)
