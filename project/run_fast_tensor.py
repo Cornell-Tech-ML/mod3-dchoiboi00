@@ -112,7 +112,7 @@ class FastTrain:
                 print(f"Training with {backend} backend")
 
         # Average epoch time
-        average_epoch_time = sum(epoch_times[1:]) / (len(epoch_times)-)
+        average_epoch_time = sum(epoch_times[1:]) / (len(epoch_times)-1)
         print(f"\nAverage Time Per Epoch: {average_epoch_time:.3f} seconds")
 
 if __name__ == "__main__":
