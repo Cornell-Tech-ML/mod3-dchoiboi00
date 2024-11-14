@@ -344,17 +344,20 @@ def tensor_reduce(
             cache[pos] = reduce_value  # start out
             to_index(out_pos, out_shape, out_index)  # get out_index of out_pos (current block)
             
+            # In every block (1024 threads), we overwrite out_index[reduce_dim] for each thread to get
+            # all 1024 values from a_storage, then we reduce.
             out_index[reduce_dim] = out_index[reduce_dim] * BLOCK_DIM + pos
 
             if out_index[reduce_dim] < a_shape[reduce_dim]:
                 cache[pos] = a_storage[index_to_position(out_index, a_strides)]
                 cuda.syncthreads()
-                index = 0
-                while 2 ** index < BLOCK_DIM:
-                    if pos % ((2 ** index) * 2) == 0:
-                        cache[pos] = fn(cache[pos], cache[pos + (2 ** index)])
+                
+                stride = 1
+                while stride < BLOCK_DIM:
+                    if pos % (stride * 2) == 0:
+                        cache[pos] = fn(cache[pos], cache[pos + stride])
                         cuda.syncthreads()
-                    index += 1
+                    stride *= 2
             if pos == 0:
                 out[out_pos] = cache[0]
 
@@ -489,9 +492,11 @@ def _tensor_matrix_multiply(
     # Accumulator for out[i,j] -> this thread will compute this value.
     result = 0.0
 
+    # Local variables to reduce global reads.
     a_rows = a_shape[-2]
     k_size = a_shape[-1]
     b_cols = b_shape[-1]
+
     # Traverse blocks over shared dimension (k) in (x, k) @ (k, y)
     for k_block in range(0, k_size, BLOCK_DIM):
         # Copy a into shared memory
@@ -524,7 +529,7 @@ def _tensor_matrix_multiply(
 
     # Write computed value into global memory
     if i < a_rows and j < b_cols:
-        out[batch * out_strides[0] + i * out_strides[-2] + j * out_strides[-1]] = result
+        out[batch * out_strides[0] + i * out_strides[1] + j * out_strides[2]] = result
 
 
 tensor_matrix_multiply = jit(_tensor_matrix_multiply)

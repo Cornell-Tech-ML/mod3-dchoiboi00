@@ -170,11 +170,7 @@ def tensor_map(
         in_strides: Strides,
     ) -> None:
         # Check if shapes + strides are aligned. If so, run function on storage directly.
-        same_strides = (
-            len(in_strides) == len(out_strides) and (in_strides == out_strides).all()
-        )
-        same_shape = len(in_shape) == len(out_shape) and (in_shape == out_shape).all()
-        if same_strides and same_shape:
+        if np.array_equal(in_strides, out_strides) and np.array_equal(in_shape, out_shape):
             for i in prange(len(out)):
                 out[i] = fn(in_storage[i])
 
@@ -226,20 +222,10 @@ def tensor_zip(
         b_shape: Shape,
         b_strides: Strides,
     ) -> None:
+        
         # Check if shapes + strides are aligned. If so, run function on storage directly.
-        same_strides = (
-            len(a_strides) == len(b_strides)
-            and len(a_strides) == len(out_strides)
-            and (a_strides == b_strides).all()
-            and (a_strides == out_strides).all()
-        )
-        same_shape = (
-            len(a_shape) == len(b_shape)
-            and len(a_shape) == len(out_shape)
-            and (a_shape == b_shape).all()
-            and (a_shape == out_shape).all()
-        )
-        if same_strides and same_shape:
+        if np.array_equal(a_strides, b_strides) and np.array_equal(a_strides, out_strides) \
+            and np.array_equal(a_shape, b_shape) and np.array_equal(a_shape, out_shape):
             for i in prange(len(out)):
                 out[i] = fn(a_storage[i], b_storage[i])
 
@@ -364,7 +350,7 @@ def _tensor_matrix_multiply(
 
     # Parallel outer loop
     for batch in prange(out_shape[0]):
-        for row in prange(out_shape[-2]):
+        for row in range(out_shape[-2]):
             for col in range(out_shape[-1]):
                 a_pos = (
                     batch * a_batch_stride + row * a_strides[-2]
