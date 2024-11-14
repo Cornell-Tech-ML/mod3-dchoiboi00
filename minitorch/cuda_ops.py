@@ -489,12 +489,15 @@ def _tensor_matrix_multiply(
     # Accumulator for out[i,j] -> this thread will compute this value.
     result = 0.0
 
+    a_rows = a_shape[-2]
+    k_size = a_shape[-1]
+    b_cols = b_shape[-1]
     # Traverse blocks over shared dimension (k) in (x, k) @ (k, y)
-    for k_block in range((a_shape[-1] + BLOCK_DIM - 1) // BLOCK_DIM):
+    for k_block in range(0, k_size, BLOCK_DIM):
         # Copy a into shared memory
         a_i = i
-        a_j = k_block * BLOCK_DIM + ty
-        if a_i < a_shape[-2] and a_j < a_shape[-1]:
+        a_j = k_block + ty
+        if a_i < a_rows and a_j < k_size:
             a_shared[tx, ty] = a_storage[
                 batch * a_batch_stride + a_i * a_strides[-2] + a_j * a_strides[-1]
             ]
@@ -502,9 +505,9 @@ def _tensor_matrix_multiply(
             a_shared[tx, ty] = 0.0
 
         # Copy b into shared memory
-        b_i = k_block * BLOCK_DIM + tx
+        b_i = k_block + tx
         b_j = j
-        if b_i < b_shape[-2] and b_j < b_shape[-1]:
+        if b_i < k_size and b_j < b_cols:
             b_shared[tx, ty] = b_storage[
                 batch * b_batch_stride + b_i * b_strides[-2] + b_j * b_strides[-1]
             ]
@@ -514,13 +517,13 @@ def _tensor_matrix_multiply(
         cuda.syncthreads()
 
         # Compute the dot product for position out[i, j] for this block.
-        for k in range(BLOCK_DIM):
+        for k in range(min(BLOCK_DIM, k_size - k_block)):
             result += a_shared[tx, k] * b_shared[k, ty]
 
         cuda.syncthreads()
 
     # Write computed value into global memory
-    if i < out_shape[-2] and j < out_shape[-1]:
+    if i < a_rows and j < b_cols:
         out[batch * out_strides[0] + i * out_strides[-2] + j * out_strides[-1]] = result
 
 
