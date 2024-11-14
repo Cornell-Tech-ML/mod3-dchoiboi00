@@ -339,46 +339,24 @@ def tensor_reduce(
         out_index = cuda.local.array(MAX_DIMS, numba.int32)
         out_pos = cuda.blockIdx.x
         pos = cuda.threadIdx.x
+        
+        if out_pos < out_size:
+            cache[pos] = reduce_value  # start out
+            to_index(out_pos, out_shape, out_index)  # get out_index of out_pos (current block)
+            
+            out_index[reduce_dim] = out_index[reduce_dim] * BLOCK_DIM + pos
 
-        # Out of bounds guard
-        if out_pos >= out_size:
-            return
-
-        # Starting index for this position
-        to_index(out_pos, out_shape, out_index)
-        out_cache_position = index_to_position(out_index, out_strides)
-
-        # Copy over out_index but into new iterable for a_index
-        a_index = cuda.local.array(MAX_DIMS, numba.int32)
-        for j in range(len(out_shape)):
-            a_index[j] = out_index[j]
-        a_index[reduce_dim] = pos  # Start at 'pos' along 'reduce_dim'
-
-        # Calculate starting position in a_storage
-        a_pos = index_to_position(a_index, a_strides)
-        cache[pos] = reduce_value
-        reduce_size = a_shape[reduce_dim]
-
-        # Move in steps of BLOCK_DIM along reduce_dim
-        while a_index[reduce_dim] < reduce_size:
-            cache[pos] = fn(cache[pos], a_storage[a_pos])
-            a_index[reduce_dim] += BLOCK_DIM
-            a_pos = index_to_position(a_index, a_strides)
-
-        cuda.syncthreads()
-
-        # Reduce within shared memory
-        stride = 1
-        while stride < BLOCK_DIM:
-            index = 2 * stride * pos
-            if index + stride < BLOCK_DIM:
-                cache[index] = fn(cache[index], cache[index + stride])
-            stride *= 2
-            cuda.syncthreads()
-
-        # Write to global
-        if pos == 0:
-            out[out_cache_position] = cache[0]
+            if out_index[reduce_dim] < a_shape[reduce_dim]:
+                cache[pos] = a_storage[index_to_position(out_index, a_strides)]
+                cuda.syncthreads()
+                index = 0
+                while 2 ** index < BLOCK_DIM:
+                    if pos % ((2 ** index) * 2) == 0:
+                        cache[pos] = fn(cache[pos], cache[pos + (2 ** index)])
+                        cuda.syncthreads()
+                    index += 1
+            if pos == 0:
+                out[out_pos] = cache[0]
 
     return jit(_reduce)  # type: ignore
 
