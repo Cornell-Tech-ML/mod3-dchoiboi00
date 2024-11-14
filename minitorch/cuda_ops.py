@@ -339,11 +339,13 @@ def tensor_reduce(
         out_index = cuda.local.array(MAX_DIMS, numba.int32)
         out_pos = cuda.blockIdx.x
         pos = cuda.threadIdx.x
-        
+
         if out_pos < out_size:
             cache[pos] = reduce_value  # start out
-            to_index(out_pos, out_shape, out_index)  # get out_index of out_pos (current block)
-            
+            to_index(
+                out_pos, out_shape, out_index
+            )  # get out_index of out_pos (current block)
+
             # In every block (1024 threads), we overwrite out_index[reduce_dim] for each thread to get
             # all 1024 values from a_storage, then we reduce.
             out_index[reduce_dim] = out_index[reduce_dim] * BLOCK_DIM + pos
@@ -351,7 +353,7 @@ def tensor_reduce(
             if out_index[reduce_dim] < a_shape[reduce_dim]:
                 cache[pos] = a_storage[index_to_position(out_index, a_strides)]
                 cuda.syncthreads()
-                
+
                 stride = 1
                 while stride < BLOCK_DIM:
                     if pos % (stride * 2) == 0:

@@ -170,7 +170,9 @@ def tensor_map(
         in_strides: Strides,
     ) -> None:
         # Check if shapes + strides are aligned. If so, run function on storage directly.
-        if np.array_equal(in_strides, out_strides) and np.array_equal(in_shape, out_shape):
+        if np.array_equal(in_strides, out_strides) and np.array_equal(
+            in_shape, out_shape
+        ):
             for i in prange(len(out)):
                 out[i] = fn(in_storage[i])
 
@@ -222,10 +224,13 @@ def tensor_zip(
         b_shape: Shape,
         b_strides: Strides,
     ) -> None:
-        
         # Check if shapes + strides are aligned. If so, run function on storage directly.
-        if np.array_equal(a_strides, b_strides) and np.array_equal(a_strides, out_strides) \
-            and np.array_equal(a_shape, b_shape) and np.array_equal(a_shape, out_shape):
+        if (
+            np.array_equal(a_strides, b_strides)
+            and np.array_equal(a_strides, out_strides)
+            and np.array_equal(a_shape, b_shape)
+            and np.array_equal(a_shape, out_shape)
+        ):
             for i in prange(len(out)):
                 out[i] = fn(a_storage[i], b_storage[i])
 

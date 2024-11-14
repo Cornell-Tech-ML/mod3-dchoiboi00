@@ -62,7 +62,7 @@ class FastTrain:
         return self.model.forward(minitorch.tensor(X, backend=self.backend))
 
     def train(self, data, learning_rate, max_epochs=500, log_fn=default_log_fn):
-        
+
         backend = "CPU" if self.backend == FastTensorBackend else "GPU"
         print(f"Training with {backend} backend")
 
