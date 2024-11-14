@@ -102,14 +102,13 @@ class FastTrain:
 
             losses.append(total_loss)
             # Logging
-            if (epoch % 10 == 0 and epoch > 0) or epoch == (max_epochs-1):
+            if (epoch % 10 == 9) or epoch == (max_epochs-1):
                 X = minitorch.tensor(data.X, backend=self.backend)
                 y = minitorch.tensor(data.y, backend=self.backend)
                 out = self.model.forward(X).view(y.shape[0])
                 y2 = minitorch.tensor(data.y)
                 correct = int(((out.detach() > 0.5) == y2).sum()[0])
                 log_fn(epoch, total_loss, correct, losses, epoch_time)
-                print(f"Training with {backend} backend")
 
         # Average epoch time
         average_epoch_time = sum(epoch_times[1:]) / (len(epoch_times)-1)
