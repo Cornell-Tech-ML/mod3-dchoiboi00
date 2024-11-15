@@ -102,7 +102,7 @@ class FastTrain:
 
             losses.append(total_loss)
             # Logging
-            if (epoch % 10 == 9) or epoch == (max_epochs-1):
+            if (epoch % 10 == 9) or (epoch == 0) or epoch == (max_epochs-1):
                 X = minitorch.tensor(data.X, backend=self.backend)
                 y = minitorch.tensor(data.y, backend=self.backend)
                 out = self.model.forward(X).view(y.shape[0])
