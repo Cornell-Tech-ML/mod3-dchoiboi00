@@ -339,6 +339,10 @@ None
 | 512    | 1.28738        | 0.28288       |
 | 1024   | 9.34824        | 0.99019       |
 
+## Speed Graph
+
+![SpeedGraph](/images/matmulspeed.png)
+
 # Task 3.5: Training
 
 I ran CPU and GPU training on the __Simple__, __Split__, and __Xor__ datasets with 100 hidden layers. For the bigger model, I ran 200 hidden layers on the __Split__ dataset.
