@@ -4,14 +4,16 @@ import numba
 
 import minitorch
 
+import time
+
 datasets = minitorch.datasets
 FastTensorBackend = minitorch.TensorBackend(minitorch.FastOps)
 if numba.cuda.is_available():
     GPUBackend = minitorch.TensorBackend(minitorch.CudaOps)
 
 
-def default_log_fn(epoch, total_loss, correct, losses):
-    print("Epoch ", epoch, " loss ", total_loss, "correct", correct)
+def default_log_fn(epoch, total_loss, correct, losses, epoch_time):
+    print(f"Epoch {epoch+1:>4}, Loss {total_loss:>.12f}, Correct {correct:>3}, Time {epoch_time:>5.3f} seconds")
 
 
 def RParam(*shape, backend):
@@ -29,8 +31,9 @@ class Network(minitorch.Module):
         self.layer3 = Linear(hidden, 1, backend)
 
     def forward(self, x):
-        # TODO: Implement for Task 3.5.
-        raise NotImplementedError("Need to implement for Task 3.5")
+        middle = self.layer1.forward(x).relu()
+        end = self.layer2.forward(middle).relu()
+        return self.layer3.forward(end).sigmoid()
 
 
 class Linear(minitorch.Module):
@@ -43,8 +46,7 @@ class Linear(minitorch.Module):
         self.out_size = out_size
 
     def forward(self, x):
-        # TODO: Implement for Task 3.5.
-        raise NotImplementedError("Need to implement for Task 3.5")
+        return x @ self.weights.value + self.bias.value
 
 
 class FastTrain:
@@ -60,12 +62,19 @@ class FastTrain:
         return self.model.forward(minitorch.tensor(X, backend=self.backend))
 
     def train(self, data, learning_rate, max_epochs=500, log_fn=default_log_fn):
+
+        backend = "CPU" if self.backend == FastTensorBackend else "GPU"
+        print(f"Training with {backend} backend")
+
         self.model = Network(self.hidden_layers, self.backend)
         optim = minitorch.SGD(self.model.parameters(), learning_rate)
         BATCH = 10
         losses = []
+        epoch_times = []
+
 
         for epoch in range(max_epochs):
+            start_time = time.time()
             total_loss = 0.0
             c = list(zip(data.X, data.y))
             random.shuffle(c)
@@ -87,16 +96,23 @@ class FastTrain:
                 # Update
                 optim.step()
 
+            end_time = time.time()
+            epoch_time = end_time - start_time
+            epoch_times.append(epoch_time)
+
             losses.append(total_loss)
             # Logging
-            if epoch % 10 == 0 or epoch == max_epochs:
+            if (epoch % 10 == 9) or (epoch == 0) or epoch == (max_epochs-1):
                 X = minitorch.tensor(data.X, backend=self.backend)
                 y = minitorch.tensor(data.y, backend=self.backend)
                 out = self.model.forward(X).view(y.shape[0])
                 y2 = minitorch.tensor(data.y)
                 correct = int(((out.detach() > 0.5) == y2).sum()[0])
-                log_fn(epoch, total_loss, correct, losses)
+                log_fn(epoch, total_loss, correct, losses, epoch_time)
 
+        # Average epoch time
+        average_epoch_time = sum(epoch_times[1:]) / (len(epoch_times)-1)
+        print(f"\nAverage Time Per Epoch: {average_epoch_time:.3f} seconds")
 
 if __name__ == "__main__":
     import argparse
@@ -116,7 +132,7 @@ if __name__ == "__main__":
     if args.DATASET == "xor":
         data = minitorch.datasets["Xor"](PTS)
     elif args.DATASET == "simple":
-        data = minitorch.datasets["Simple"].simple(PTS)
+        data = minitorch.datasets["Simple"](PTS)
     elif args.DATASET == "split":
         data = minitorch.datasets["Split"](PTS)
 
