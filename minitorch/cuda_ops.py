@@ -477,7 +477,7 @@ def _tensor_matrix_multiply(
     a_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
     b_shared = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
 
-    # The final position c[i, j]
+    # The final position c[i, j] (output matrix position)
     i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
     j = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
 
@@ -495,38 +495,42 @@ def _tensor_matrix_multiply(
     result = 0.0
 
     # Local variables to reduce global reads.
-    a_rows = a_shape[-2]
-    k_size = a_shape[-1]
-    b_cols = b_shape[-1]
+    a_rows = a_shape[-2]  # rows in A
+    k_size = a_shape[-1]  # shared dimension in A and B
+    b_cols = b_shape[-1]  # cols in B
 
-    # Traverse blocks over shared dimension (k) in (x, k) @ (k, y)
+    # Traverse blocks over shared dimension (k) in (x, k) @ (k, y) in steps of BLOCK_DIM
     for k_block in range(0, k_size, BLOCK_DIM):
         # Copy a into shared memory
         a_i = i
-        a_j = k_block + ty
-        if a_i < a_rows and a_j < k_size:
+        a_j = k_block + ty  # Column index offset by block position
+        if a_i < a_rows and a_j < k_size:  # if within bounds of A
             a_shared[tx, ty] = a_storage[
                 batch * a_batch_stride + a_i * a_strides[-2] + a_j * a_strides[-1]
             ]
         else:
-            a_shared[tx, ty] = 0.0
+            a_shared[tx, ty] = 0.0  # Zero-pad if out of bounds
 
         # Copy b into shared memory
-        b_i = k_block + tx
+        b_i = k_block + tx  # Row index offset by block position
         b_j = j
-        if b_i < k_size and b_j < b_cols:
+        if b_i < k_size and b_j < b_cols:  # if within bounds of B
             b_shared[tx, ty] = b_storage[
                 batch * b_batch_stride + b_i * b_strides[-2] + b_j * b_strides[-1]
             ]
         else:
-            b_shared[tx, ty] = 0.0
+            b_shared[tx, ty] = 0.0  # Zero-pad if out of bounds
 
+        # Synchronize threads to ensure shared memory is filled
         cuda.syncthreads()
 
-        # Compute the dot product for position out[i, j] for this block.
+        # Compute the partial dot product for out[i, j]
+        # Only for this block. Iterate over shared dimension.
+        # Go only up until the end of the shared dimension.
         for k in range(min(BLOCK_DIM, k_size - k_block)):
             result += a_shared[tx, k] * b_shared[k, ty]
 
+        # Sync threads to avoid race conditions before next block
         cuda.syncthreads()
 
     # Write computed value into global memory
